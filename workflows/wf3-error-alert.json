@@ -1,0 +1,91 @@
+{
+  "id": "igdmWf3ErrorAlert",
+  "name": "wf3-error-alert",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "6ae7088f-e805-5b1e-5e16-02f7ef90f0fe",
+      "name": "Error Trigger",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst e = $input.first().json;\nconst ex = e.execution || {};\nconst wfn = (e.workflow || {}).name || 'unknown workflow';\nconst node = ex.lastNodeExecuted || 'unknown node';\nconst msg = (ex.error || {}).message || 'no message';\nconst base = ($env.WEBHOOK_URL || '').replace(/\\/$/, '');\nconst link = base && ex.id ? base + '/workflow/' + (e.workflow || {}).id + '/executions/' + ex.id : '(no link)';\nreturn { json: { text: 'n8n ERROR in ' + wfn + '\\nNode: ' + node + '\\nError: ' + String(msg).slice(0, 800) + '\\nExecution: ' + link } };\n"
+      },
+      "id": "11e9562f-4cfa-7cc7-e896-d2129b17a6c0",
+      "name": "Format Error",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.TELEGRAM_API_BASE || 'https://api.telegram.org') }}/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: String($json.text).slice(0, 3900) }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "f31e4101-121d-1765-115b-ec70c27dedac",
+      "name": "Telegram Error Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Format Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Error": {
+      "main": [
+        [
+          {
+            "node": "Telegram Error Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

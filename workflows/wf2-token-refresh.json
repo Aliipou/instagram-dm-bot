@@ -1,0 +1,341 @@
+{
+  "id": "igdmWf2TokenRefr1",
+  "name": "wf2-token-refresh",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "weeksInterval": 1,
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 4,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "305fc248-5806-a30a-0c55-264d2a1659ae",
+      "name": "Weekly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "igdm_config"
+        },
+        "returnAll": true
+      },
+      "id": "62533eb2-1e8c-f999-4a93-9f00a7e2906c",
+      "name": "Read Config",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst rows = $input.all().map((i) => i.json).filter((r) => r && r.key);\nconst cfg = Object.fromEntries(rows.map((r) => [r.key, r.value]));\nif (!cfg.ig_access_token) throw new Error(\"config Data Table has no 'ig_access_token' row (see docs/meta-setup.md step 6)\");\nconst now = Date.now();\nconst exp = cfg.ig_token_expires_at ? new Date(cfg.ig_token_expires_at).getTime() : NaN;\nconst daysLeft = Number.isFinite(exp) ? (exp - now) / 86400000 : null;\n// A token must be at least 24 h old to be refreshed; a fresh 60-day token has > 59 days left.\nconst tooYoung = daysLeft !== null && daysLeft > 59;\nreturn [{ json: { token: cfg.ig_access_token, daysLeft, needsRefresh: !tooYoung,\n  expiringSoon: daysLeft !== null && daysLeft < 7,\n  alert: 'Instagram token expires in ' + (daysLeft === null ? 'an unknown time' : daysLeft.toFixed(1) + ' days') + '. WF2 is refreshing it; if you keep seeing this, renew it manually (docs/meta-setup.md).' } }];\n"
+      },
+      "id": "862f5760-f915-4b1c-3fbd-9f88273e025c",
+      "name": "Evaluate Token",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "508d68ca-c31c-93a0-5ef2-01b2379d24c6",
+              "leftValue": "={{ $json.needsRefresh === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c6f81333-4050-6303-b402-242afac74c52",
+      "name": "Needs Refresh?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.IG_GRAPH_BASE }}/refresh_access_token",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "grant_type",
+              "value": "ig_refresh_token"
+            },
+            {
+              "name": "access_token",
+              "value": "={{ $json.token }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "ee457f73-2e12-64c1-2efb-fc7331a985dc",
+      "name": "Refresh Token",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        -80
+      ],
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst r = $input.first().json;\nif (!r.access_token || !r.expires_in) throw new Error('refresh_access_token returned no token: ' + JSON.stringify(r).slice(0, 300));\nconst exp = new Date(Date.now() + Number(r.expires_in) * 1000).toISOString();\nconst now = new Date().toISOString();\nreturn [\n  { json: { key: 'ig_access_token', value: r.access_token, updated_at: now } },\n  { json: { key: 'ig_token_expires_at', value: exp, updated_at: now } },\n];\n"
+      },
+      "id": "035084ba-a059-c1ae-d166-cb98c3355109",
+      "name": "Prepare Config Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "igdm_config"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "key",
+              "condition": "eq",
+              "keyValue": "={{ $json.key }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "key": "={{ $json.key }}",
+            "value": "={{ $json.value }}",
+            "updated_at": "={{ $json.updated_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "78aff140-fcce-fe84-fd3c-6e8a4f90609c",
+      "name": "Save Config",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "644f676e-2537-f6d5-4e8f-c52eb029c7bd",
+              "leftValue": "={{ $json.expiringSoon === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "bec4f1bd-6d74-f238-282a-f9e2353bd6d5",
+      "name": "Expiring Soon?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.TELEGRAM_API_BASE || 'https://api.telegram.org') }}/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: String($json.alert).slice(0, 3900) }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "2657487b-232e-dd70-3606-5a7c7cff9402",
+      "name": "Telegram Token Warning",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        120
+      ]
+    }
+  ],
+  "connections": {
+    "Weekly": {
+      "main": [
+        [
+          {
+            "node": "Read Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Config": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Token": {
+      "main": [
+        [
+          {
+            "node": "Needs Refresh?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Expiring Soon?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Refresh?": {
+      "main": [
+        [
+          {
+            "node": "Refresh Token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Token": {
+      "main": [
+        [
+          {
+            "node": "Prepare Config Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Config Rows": {
+      "main": [
+        [
+          {
+            "node": "Save Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expiring Soon?": {
+      "main": [
+        [
+          {
+            "node": "Telegram Token Warning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "igdmWf3ErrorAlert"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

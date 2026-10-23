@@ -1,0 +1,6 @@
+.env
+*.log
+node_modules/
+n8n_data/
+caddy_data/
+caddy_config/

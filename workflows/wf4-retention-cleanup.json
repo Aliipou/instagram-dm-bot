@@ -1,0 +1,177 @@
+{
+  "id": "igdmWf4Retention01",
+  "name": "wf4-retention-cleanup",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1,
+              "triggerAtHour": 3,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "695e5365-6840-b4cc-a04d-51e7f3603719",
+      "name": "Daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "igdm_messages"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "created_at",
+              "condition": "lt",
+              "keyValue": "={{ new Date(Date.now() - Math.max(1, Number($env.RETENTION_DAYS || 30)) * 86400000).toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "39907328-ee74-174b-be45-bcfe66acc8f2",
+      "name": "Delete Old Messages",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        220,
+        0
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "deleteRows",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "igdm_processed_messages"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "received_at",
+              "condition": "lt",
+              "keyValue": "={{ new Date(Date.now() - Math.max(1, Number($env.RETENTION_DAYS || 30)) * 86400000).toISOString() }}"
+            }
+          ]
+        }
+      },
+      "id": "5c3724d3-eda4-9c2e-c0c5-6c771f37fd8e",
+      "name": "Delete Old Processed",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        440,
+        0
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "igdm_conversations"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "human"
+            },
+            {
+              "keyName": "paused_until",
+              "condition": "lt",
+              "keyValue": "={{ new Date().toISOString() }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "bot",
+            "updated_at": "={{ new Date().toISOString() }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "5060757f-3cda-714c-c2f2-6b7a04939397",
+      "name": "Resume Bot After Pause",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        0
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    }
+  ],
+  "connections": {
+    "Daily": {
+      "main": [
+        [
+          {
+            "node": "Delete Old Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Old Messages": {
+      "main": [
+        [
+          {
+            "node": "Delete Old Processed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete Old Processed": {
+      "main": [
+        [
+          {
+            "node": "Resume Bot After Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "igdmWf3ErrorAlert"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

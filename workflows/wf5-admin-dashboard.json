@@ -1,0 +1,1063 @@
+{
+  "id": "igdmWf5Admin01",
+  "name": "wf5-admin-dashboard",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "admin",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "59956201-94ee-1ce7-77dd-619d3df06b72",
+      "name": "Webhook Page",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "a1c0f2b4-5555-4a6e-9c01-0000000000a5"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst key = String($env.ADMIN_KEY || '');\nconst given = String(($json.query || {}).key || '');\nconst ok = key.length >= 12 && given === key;\nconst page = \"<!doctype html>\\n<html lang=\\\"en\\\">\\n<head>\\n<meta charset=\\\"utf-8\\\">\\n<meta name=\\\"viewport\\\" content=\\\"width=device-width, initial-scale=1\\\">\\n<meta name=\\\"robots\\\" content=\\\"noindex\\\">\\n<title>Shop assistant</title>\\n<style>\\n  :root {\\n    --bg: #f5f6f8; --card: #ffffff; --text: #1d2330; --muted: #657084; --line: #e3e6ec;\\n    --green: #16875a; --green-bg: #e3f5ec; --amber: #a86400; --amber-bg: #fff2d9;\\n    --red: #b3261e; --red-bg: #fde7e5; --blue: #2457d6; --blue-bg: #e6edfd;\\n  }\\n  @media (prefers-color-scheme: dark) {\\n    :root {\\n      --bg: #12151c; --card: #1b2029; --text: #eef0f4; --muted: #9aa4b5; --line: #2b3240;\\n      --green: #4cc38a; --green-bg: #123226; --amber: #f0b24a; --amber-bg: #3a2a0c;\\n      --red: #ff8a80; --red-bg: #3c1a18; --blue: #7da2ff; --blue-bg: #1b2a52;\\n    }\\n  }\\n  * { box-sizing: border-box; }\\n  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 system-ui, -apple-system, \\\"Segoe UI\\\", Roboto, sans-serif; }\\n  main { max-width: 720px; margin: 0 auto; padding: 16px; }\\n  header { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 16px; }\\n  h1 { font-size: 22px; margin: 0; }\\n  h2 { font-size: 18px; margin: 0 0 4px; }\\n  .muted { color: var(--muted); font-size: 14px; }\\n  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }\\n  .modes { display: grid; gap: 10px; margin-top: 12px; }\\n  .mode { text-align: left; border: 2px solid var(--line); background: var(--card); color: var(--text); border-radius: 12px; padding: 14px; cursor: pointer; font: inherit; }\\n  .mode b { display: block; font-size: 17px; }\\n  .mode span { color: var(--muted); font-size: 14px; }\\n  .mode.sel.auto { border-color: var(--green); background: var(--green-bg); }\\n  .mode.sel.shadow { border-color: var(--amber); background: var(--amber-bg); }\\n  .mode.sel.off { border-color: var(--red); background: var(--red-bg); }\\n  .mode:disabled { opacity: .6; cursor: wait; }\\n  .pill { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 13px; font-weight: 600; }\\n  .pill.ok { background: var(--green-bg); color: var(--green); }\\n  .pill.warn { background: var(--amber-bg); color: var(--amber); }\\n  .pill.bad { background: var(--red-bg); color: var(--red); }\\n  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }\\n  .wait { border-left: 5px solid var(--amber); }\\n  .msg { background: var(--bg); border-radius: 10px; padding: 8px 12px; margin: 6px 0; font-size: 15px; white-space: pre-wrap; word-break: break-word; }\\n  .msg.bot { background: var(--blue-bg); }\\n  .msg.owner { background: var(--green-bg); }\\n  .msg small { display: block; color: var(--muted); font-size: 12px; }\\n  button.btn, a.btn { display: inline-block; border: 0; border-radius: 10px; padding: 12px 16px; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; background: var(--blue); color: #fff; }\\n  button.btn.sec, a.btn.sec { background: var(--bg); color: var(--text); border: 1px solid var(--line); }\\n  button.btn:disabled { opacity: .6; cursor: wait; }\\n  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }\\n  details summary { cursor: pointer; padding: 6px 0; font-weight: 600; }\\n  textarea { width: 100%; min-height: 320px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; font: 14px/1.5 ui-monospace, Consolas, monospace; background: var(--bg); color: var(--text); resize: vertical; }\\n  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 99px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90vw; }\\n  #toast.show { opacity: 1; }\\n  #err { display: none; background: var(--red-bg); color: var(--red); padding: 12px; border-radius: 10px; margin-bottom: 16px; }\\n</style>\\n</head>\\n<body>\\n<main>\\n  <header>\\n    <h1>Shop assistant</h1>\\n    <span class=\\\"muted\\\" id=\\\"updated\\\">Loading…</span>\\n  </header>\\n  <div id=\\\"err\\\"></div>\\n\\n  <section class=\\\"card\\\" id=\\\"modeCard\\\">\\n    <h2>What should the assistant do?</h2>\\n    <div class=\\\"muted\\\" id=\\\"modeNote\\\"></div>\\n    <div class=\\\"modes\\\" id=\\\"modes\\\"></div>\\n  </section>\\n\\n  <section class=\\\"card\\\" id=\\\"health\\\"></section>\\n\\n  <section id=\\\"waiting\\\"></section>\\n\\n  <section class=\\\"card\\\">\\n    <h2>Shop info the assistant uses</h2>\\n    <p class=\\\"muted\\\">Opening hours, prices, delivery, returns. The assistant answers only from this text. Changes take effect on the next customer message.</p>\\n    <textarea id=\\\"shop\\\" spellcheck=\\\"false\\\" placeholder=\\\"Loading…\\\"></textarea>\\n    <div class=\\\"actions\\\">\\n      <button class=\\\"btn\\\" id=\\\"saveShop\\\">Save shop info</button>\\n      <span class=\\\"muted\\\" id=\\\"shopState\\\" style=\\\"align-self:center\\\"></span>\\n    </div>\\n  </section>\\n\\n  <section class=\\\"card\\\">\\n    <h2>Recent conversations</h2>\\n    <div id=\\\"recent\\\" class=\\\"muted\\\">Loading…</div>\\n  </section>\\n\\n  <p class=\\\"muted\\\" id=\\\"stats\\\"></p>\\n</main>\\n<div id=\\\"toast\\\"></div>\\n\\n<script>\\n(function () {\\n  var KEY = new URLSearchParams(location.search).get('key') || '';\\n  var API = location.pathname.replace(/\\\\/admin\\\\/?$/, '/admin-api');\\n  var shopDirty = false;\\n  var MODES = [\\n    { id: 'auto', title: 'On: reply to customers', text: 'The assistant answers customers by itself.' },\\n    { id: 'shadow', title: 'Practice: write drafts only', text: 'Nothing is sent to customers. Drafts arrive on Telegram so you can check them.' },\\n    { id: 'off', title: 'Off: do nothing', text: 'The assistant ignores all messages. Use this if something looks wrong.' }\\n  ];\\n\\n  function $(id) { return document.getElementById(id); }\\n  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }\\n  function toast(t) { var x = $('toast'); x.textContent = t; x.className = 'show'; setTimeout(function () { x.className = ''; }, 2600); }\\n  function showErr(t) { var x = $('err'); x.style.display = t ? 'block' : 'none'; x.textContent = t || ''; }\\n\\n  function call(body) {\\n    body.key = KEY;\\n    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })\\n      .then(function (r) {\\n        if (r.status === 401) throw new Error('Wrong or missing key. Open the link you were given, including the ?key=… part.');\\n        if (!r.ok) throw new Error('Server error (' + r.status + '). Try again in a minute.');\\n        return r.json();\\n      });\\n  }\\n  function ago(iso) {\\n    if (!iso) return '';\\n    var m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);\\n    if (m < 1) return 'just now';\\n    if (m < 60) return m + ' min ago';\\n    if (m < 1440) return Math.round(m / 60) + ' h ago';\\n    return Math.round(m / 1440) + ' days ago';\\n  }\\n  function until(iso) {\\n    var m = Math.round((new Date(iso).getTime() - Date.now()) / 60000);\\n    if (m <= 0) return 'now';\\n    return m < 90 ? 'in ' + m + ' min' : 'in ' + Math.round(m / 60) + ' h';\\n  }\\n\\n  function renderModes(s) {\\n    var wrap = $('modes'); wrap.textContent = '';\\n    MODES.forEach(function (m) {\\n      var b = el('button', 'mode ' + m.id + (s.mode === m.id ? ' sel' : ''));\\n      b.appendChild(el('b', null, (s.mode === m.id ? '✓ ' : '') + m.title));\\n      b.appendChild(el('span', null, m.text));\\n      b.onclick = function () {\\n        if (s.mode === m.id) return;\\n        if (m.id === 'auto' && !confirm('Turn ON? The assistant will start replying to real customers.')) return;\\n        wrap.querySelectorAll('button').forEach(function (x) { x.disabled = true; });\\n        call({ action: 'set_mode', mode: m.id }).then(function () { toast('Saved'); load(); }).catch(function (e) { showErr(e.message); load(); });\\n      };\\n      wrap.appendChild(b);\\n    });\\n    $('modeNote').textContent = s.mode === 'auto' ? 'Right now: ON. Customers get replies.' : s.mode === 'shadow' ? 'Right now: PRACTICE. Customers get nothing yet.' : 'Right now: OFF.';\\n  }\\n\\n  function renderHealth(s) {\\n    var h = $('health'); h.textContent = '';\\n    var row = el('div', 'row');\\n    row.appendChild(el('b', null, 'Instagram connection'));\\n    var d = s.token.daysLeft;\\n    var pill;\\n    if (d == null) pill = el('span', 'pill warn', 'Unknown');\\n    else if (d < 0) pill = el('span', 'pill bad', 'Expired: needs a new token');\\n    else if (d < 7) pill = el('span', 'pill warn', 'Expires in ' + Math.floor(d) + ' days');\\n    else pill = el('span', 'pill ok', 'Working · renews itself (' + Math.floor(d) + ' days left)');\\n    row.appendChild(pill);\\n    h.appendChild(row);\\n    if (d != null && d < 7) h.appendChild(el('p', 'muted', 'Follow “Renew the Instagram token” in docs/meta-setup.md.'));\\n  }\\n\\n  function bubble(m) {\\n    var d = el('div', 'msg ' + m.sender);\\n    d.appendChild(el('small', null, (m.sender === 'customer' ? 'Customer' : m.sender === 'bot' ? 'Assistant' : 'You') + ' · ' + ago(m.at)));\\n    d.appendChild(document.createTextNode(m.text));\\n    return d;\\n  }\\n\\n  function renderWaiting(s) {\\n    var w = $('waiting'); w.textContent = '';\\n    var box = el('div', 'card' + (s.waiting.length ? ' wait' : ''));\\n    box.appendChild(el('h2', null, s.waiting.length ? 'Needs you (' + s.waiting.length + ')' : 'Needs you'));\\n    if (!s.waiting.length) { box.appendChild(el('p', 'muted', 'Nothing is waiting for you.')); }\\n    s.waiting.forEach(function (c) {\\n      var item = el('div'); item.style.marginTop = '12px';\\n      item.appendChild(el('div', 'muted', 'Customer …' + c.short + ' · last wrote ' + ago(c.lastCustomerAt) + ' · assistant stays quiet until ' + until(c.pausedUntil)));\\n      c.messages.forEach(function (m) { item.appendChild(bubble(m)); });\\n      var a = el('div', 'actions');\\n      var open = el('a', 'btn', 'Reply in Instagram'); open.href = 'https://www.instagram.com/direct/inbox/'; open.target = '_blank'; open.rel = 'noopener';\\n      var back = el('button', 'btn sec', 'Done: hand back to assistant');\\n      back.onclick = function () { back.disabled = true; call({ action: 'resume', igsid: c.igsid }).then(function () { toast('Handed back'); load(); }).catch(function (e) { showErr(e.message); back.disabled = false; }); };\\n      a.appendChild(open); a.appendChild(back); item.appendChild(a);\\n      box.appendChild(item);\\n    });\\n    w.appendChild(box);\\n  }\\n\\n  function renderRecent(s) {\\n    var r = $('recent'); r.textContent = '';\\n    if (!s.recent.length) { r.textContent = 'No conversations yet.'; return; }\\n    s.recent.forEach(function (c) {\\n      var d = el('details');\\n      var sum = el('summary', null, '…' + c.short + ' · ' + ago(c.updatedAt) + (c.status === 'human' ? ' · with you' : ''));\\n      d.appendChild(sum);\\n      c.messages.forEach(function (m) { d.appendChild(bubble(m)); });\\n      r.appendChild(d);\\n    });\\n  }\\n\\n  function load() {\\n    return call({ action: 'status' }).then(function (s) {\\n      showErr('');\\n      renderModes(s); renderHealth(s); renderWaiting(s); renderRecent(s);\\n      $('stats').textContent = 'Last 24 hours: ' + s.stats.inbound + ' customer messages, ' + s.stats.bot + ' assistant replies, ' + s.stats.owner + ' replies from you.';\\n      $('updated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });\\n    }).catch(function (e) { showErr(e.message); $('updated').textContent = ''; });\\n  }\\n\\n  function loadShop() {\\n    call({ action: 'get_shop' }).then(function (r) { $('shop').value = r.text; $('shop').placeholder = ''; shopDirty = false; })\\n      .catch(function (e) { showErr(e.message); });\\n  }\\n  $('shop').addEventListener('input', function () { shopDirty = true; $('shopState').textContent = 'Not saved yet'; });\\n  $('saveShop').onclick = function () {\\n    var b = $('saveShop'); b.disabled = true;\\n    call({ action: 'save_shop', text: $('shop').value }).then(function (r) {\\n      if (!r.ok) throw new Error(r.error || 'Could not save');\\n      shopDirty = false; $('shopState').textContent = 'Saved ✓'; toast('Shop info saved');\\n    }).catch(function (e) { showErr(e.message); }).then(function () { b.disabled = false; });\\n  };\\n\\n  load(); loadShop();\\n  setInterval(function () { if (!document.hidden) load(); }, 30000);\\n})();\\n</script>\\n</body>\\n</html>\\n\";\nconst setup = '<!doctype html><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><body style=\"font:16px system-ui;padding:24px\"><h2>Dashboard is locked</h2><p>' + (key.length < 12 ? 'Set ADMIN_KEY (at least 12 characters) in .env and restart n8n.' : 'Open the link with your key: <code>/webhook/admin?key=YOUR_KEY</code>') + '</p></body>';\nreturn { json: { ok, html: ok ? page : setup } };\n"
+      },
+      "id": "a346e980-f98e-3cdd-184f-bf61f3dfa01c",
+      "name": "Serve Page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9d9a5224-50c1-8222-6827-3ac285ffad96",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4ae595c9-cd7d-79b9-bb5f-4999e2693f07",
+      "name": "Key OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              },
+              {
+                "name": "Referrer-Policy",
+                "value": "no-referrer"
+              },
+              {
+                "name": "X-Frame-Options",
+                "value": "DENY"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "4829bf81-9ea7-87c9-d3f7-ba89d856958f",
+      "name": "Respond Page",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseCode": 401,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html; charset=utf-8"
+              },
+              {
+                "name": "Referrer-Policy",
+                "value": "no-referrer"
+              },
+              {
+                "name": "X-Frame-Options",
+                "value": "DENY"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "e248a77e-ba49-e692-7ec4-f576675f202c",
+      "name": "Respond Locked",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "admin-api",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "310b7538-0eb5-bb45-3c13-55d6fc432f31",
+      "name": "Webhook API",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        400
+      ],
+      "webhookId": "a1c0f2b4-6666-4a6e-9c01-0000000000a6"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst key = String($env.ADMIN_KEY || '');\nconst b = $json.body || {};\nconst ok = key.length >= 12 && typeof b.key === 'string' && b.key === key;\nconst action = ['status', 'set_mode', 'resume', 'get_shop', 'save_shop'].includes(b.action) ? b.action : 'none';\nconst out = { ok, action };\nif (action === 'set_mode') { out.mode = ['off', 'shadow', 'auto'].includes(b.mode) ? b.mode : null; if (!out.mode) out.ok = false; }\nif (action === 'resume') { out.igsid = String(b.igsid || ''); if (!out.igsid) out.ok = false; }\nif (action === 'save_shop') { out.text = typeof b.text === 'string' ? b.text : ''; }\nreturn { json: out };\n"
+      },
+      "id": "8519fe33-1b82-272d-65b2-6d884e9f0df2",
+      "name": "Parse Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9c7b0b9f-7ccc-cdef-8439-c22ac7cde64d",
+              "leftValue": "={{ $json.ok === true && $json.action !== 'none' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7796e48b-94b2-fb44-d134-4ebed1c2e244",
+      "name": "Authorized?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        440,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: \"unauthorized\" }) }}",
+        "options": {
+          "responseCode": 401,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "711decbf-98b5-3a4b-4ed6-b6f4b645cd21",
+      "name": "Respond Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        660,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "act-0",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "status",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "status"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "act-1",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "set_mode",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "set_mode"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "act-2",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "resume",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "resume"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "act-3",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "get_shop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "get_shop"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "act-4",
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "save_shop",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "save_shop"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "id": "65f37bf7-eb1d-207f-a461-893358549027",
+      "name": "Route Action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        660,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "igdm_conversations"
+        },
+        "returnAll": true
+      },
+      "id": "7933b8df-acc7-bb3a-76a0-afd24be3bb43",
+      "name": "Get Conversations",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        100
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "igdm_messages"
+        },
+        "returnAll": true
+      },
+      "id": "ec8fbaf4-dfac-641b-6f4a-8039ae6c516c",
+      "name": "Get Messages",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        100
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "igdm_config"
+        },
+        "returnAll": true
+      },
+      "id": "6d15a87e-3f51-cc4b-dea1-9e136efa3da2",
+      "name": "Get Config",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        100
+      ],
+      "alwaysOutputData": true,
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "\nconst now = Date.now();\nconst convs = $('Get Conversations').all().map((i) => i.json).filter((r) => r && r.igsid);\nconst msgs = $('Get Messages').all().map((i) => i.json).filter((r) => r && r.igsid);\nconst cfg = Object.fromEntries($('Get Config').all().map((i) => i.json).filter((r) => r && r.key).map((r) => [r.key, r.value]));\n\nconst modeRow = String(cfg.bot_mode || '').toLowerCase();\nconst mode = ['off', 'shadow', 'auto'].includes(modeRow) ? modeRow : (String($env.BOT_MODE || 'shadow').toLowerCase() === 'auto' ? 'auto' : 'shadow');\n\nconst exp = cfg.ig_token_expires_at ? new Date(cfg.ig_token_expires_at).getTime() : NaN;\nconst token = { daysLeft: Number.isFinite(exp) ? (exp - now) / 86400000 : null };\n\nconst t = (v) => (v ? new Date(v).toISOString() : null);\nconst byUser = {};\nfor (const m of msgs) (byUser[m.igsid] ||= []).push(m);\nconst view = (c, n) => ({\n  igsid: c.igsid,\n  short: String(c.igsid).slice(-4),\n  status: c.status || 'bot',\n  pausedUntil: t(c.paused_until),\n  lastCustomerAt: t(c.last_customer_msg_at),\n  updatedAt: t(c.updated_at) || t(c.last_customer_msg_at),\n  messages: (byUser[c.igsid] || [])\n    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at))\n    .slice(-n)\n    .map((m) => ({ sender: m.sender, text: String(m.text || '').slice(0, 600), at: t(m.created_at) })),\n});\n\nconst waiting = convs\n  .filter((c) => c.status === 'human' && c.paused_until && new Date(c.paused_until).getTime() > now)\n  .map((c) => view(c, 3))\n  .sort((a, b) => new Date(b.lastCustomerAt || 0) - new Date(a.lastCustomerAt || 0));\nconst recent = convs\n  .map((c) => view(c, 8))\n  .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))\n  .slice(0, 15);\n\nconst day = now - 86400000;\nconst last24 = msgs.filter((m) => m.created_at && new Date(m.created_at).getTime() > day);\nconst stats = {\n  inbound: last24.filter((m) => m.sender === 'customer').length,\n  bot: last24.filter((m) => m.sender === 'bot').length,\n  owner: last24.filter((m) => m.sender === 'owner').length,\n};\nreturn { json: { mode, token, waiting, recent, stats } };\n"
+      },
+      "id": "007529b6-815a-8ef3-d106-3e5ebab191c1",
+      "name": "Build Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "8fa4262e-a69e-5f6b-235c-c24c6f5b1da9",
+      "name": "Respond Status",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1780,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "igdm_config"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "key",
+              "condition": "eq",
+              "keyValue": "bot_mode"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "key": "bot_mode",
+            "value": "={{ $json.mode }}",
+            "updated_at": "={{ new Date().toISOString() }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "adc9acba-37a2-5e04-93d0-d1af2890f5fb",
+      "name": "Save Mode",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify({ ok: true }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "14afc9bc-7e5a-6ff1-ab2d-a3fe74bb329b",
+      "name": "Respond Mode",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "igdm_conversations"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "igsid",
+              "condition": "eq",
+              "keyValue": "={{ $json.igsid }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "bot",
+            "updated_at": "={{ new Date().toISOString() }}"
+          },
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "id": "9cd0f9ed-a2b7-805e-f950-e642dc890a85",
+      "name": "Resume Customer",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        420
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify({ ok: true }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "939ac01a-80f7-6aca-77fd-f473aa63e0a9",
+      "name": "Respond Resume",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1120,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "/data/knowledge/shop.md",
+        "options": {
+          "dataPropertyName": "data"
+        }
+      },
+      "id": "cebeafc7-9506-d194-620e-fafc2f349b43",
+      "name": "Read Shop",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        900,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst buf = await this.helpers.getBinaryDataBuffer(0, 'data');\nreturn { json: { text: buf.toString('utf8') } };\n"
+      },
+      "id": "46a24a17-7cad-f2e1-b98d-df9b30403595",
+      "name": "Decode Shop Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify({ text: $json.text }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "170be410-2186-44fb-97f8-0b4559a5fca7",
+      "name": "Respond Shop",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst text = String($('Parse Request').item.json.text || '');\nif (text.trim().length < 20) return { json: { ok: false, error: 'The shop info is empty or too short. Nothing was saved.' } };\nif (Buffer.byteLength(text, 'utf8') > 100000) return { json: { ok: false, error: 'The text is too long (over 100 KB). Nothing was saved.' } };\nconst bin = await this.helpers.prepareBinaryData(Buffer.from(text, 'utf8'), 'shop.md', 'text/markdown');\nreturn { json: { ok: true }, binary: { data: bin } };\n"
+      },
+      "id": "cedcb0e2-7490-9eff-5377-cbd216928042",
+      "name": "Prepare Shop",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ae1b6753-54cf-c341-b38c-2e241942bb3f",
+              "leftValue": "={{ $json.ok === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "71bac222-7507-f517-1334-eadd2477b90a",
+      "name": "Shop Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        740
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "/data/knowledge/shop.md",
+        "dataPropertyName": "data",
+        "options": {
+          "append": false
+        }
+      },
+      "id": "dfa58bf8-3536-f1f1-f458-91de5fd2da03",
+      "name": "Write Shop",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify({ ok: true }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "bcef1356-fba7-6bf2-3d3e-e81363f707a3",
+      "name": "Respond Saved",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: $json.error }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json; charset=utf-8"
+              },
+              {
+                "name": "Cache-Control",
+                "value": "no-store"
+              }
+            ]
+          }
+        }
+      },
+      "id": "f1df93f1-5718-1aa6-020f-dbc546c57de6",
+      "name": "Respond Shop Invalid",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1340,
+        840
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Page": {
+      "main": [
+        [
+          {
+            "node": "Serve Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Serve Page": {
+      "main": [
+        [
+          {
+            "node": "Key OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Key OK?": {
+      "main": [
+        [
+          {
+            "node": "Respond Page",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Locked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook API": {
+      "main": [
+        [
+          {
+            "node": "Parse Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Request": {
+      "main": [
+        [
+          {
+            "node": "Authorized?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Authorized?": {
+      "main": [
+        [
+          {
+            "node": "Route Action",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Action": {
+      "main": [
+        [
+          {
+            "node": "Get Conversations",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save Mode",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resume Customer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Read Shop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Shop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Conversations": {
+      "main": [
+        [
+          {
+            "node": "Get Messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Messages": {
+      "main": [
+        [
+          {
+            "node": "Get Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Config": {
+      "main": [
+        [
+          {
+            "node": "Build Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Status": {
+      "main": [
+        [
+          {
+            "node": "Respond Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Mode": {
+      "main": [
+        [
+          {
+            "node": "Respond Mode",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resume Customer": {
+      "main": [
+        [
+          {
+            "node": "Respond Resume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Shop": {
+      "main": [
+        [
+          {
+            "node": "Decode Shop Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decode Shop Text": {
+      "main": [
+        [
+          {
+            "node": "Respond Shop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Shop": {
+      "main": [
+        [
+          {
+            "node": "Shop Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Shop Valid?": {
+      "main": [
+        [
+          {
+            "node": "Write Shop",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Shop Invalid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Shop": {
+      "main": [
+        [
+          {
+            "node": "Respond Saved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "errorWorkflow": "igdmWf3ErrorAlert"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

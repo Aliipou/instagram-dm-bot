@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Shop assistant</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #1d2330; --muted: #657084; --line: #e3e6ec;
+    --green: #16875a; --green-bg: #e3f5ec; --amber: #a86400; --amber-bg: #fff2d9;
+    --red: #b3261e; --red-bg: #fde7e5; --blue: #2457d6; --blue-bg: #e6edfd;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151c; --card: #1b2029; --text: #eef0f4; --muted: #9aa4b5; --line: #2b3240;
+      --green: #4cc38a; --green-bg: #123226; --amber: #f0b24a; --amber-bg: #3a2a0c;
+      --red: #ff8a80; --red-bg: #3c1a18; --blue: #7da2ff; --blue-bg: #1b2a52;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+  header { display: flex; justify-content: space-between; align-items: baseline; margin: 8px 0 16px; }
+  h1 { font-size: 22px; margin: 0; }
+  h2 { font-size: 18px; margin: 0 0 4px; }
+  .muted { color: var(--muted); font-size: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; margin-bottom: 16px; }
+  .modes { display: grid; gap: 10px; margin-top: 12px; }
+  .mode { text-align: left; border: 2px solid var(--line); background: var(--card); color: var(--text); border-radius: 12px; padding: 14px; cursor: pointer; font: inherit; }
+  .mode b { display: block; font-size: 17px; }
+  .mode span { color: var(--muted); font-size: 14px; }
+  .mode.sel.auto { border-color: var(--green); background: var(--green-bg); }
+  .mode.sel.shadow { border-color: var(--amber); background: var(--amber-bg); }
+  .mode.sel.off { border-color: var(--red); background: var(--red-bg); }
+  .mode:disabled { opacity: .6; cursor: wait; }
+  .pill { display: inline-block; padding: 3px 10px; border-radius: 99px; font-size: 13px; font-weight: 600; }
+  .pill.ok { background: var(--green-bg); color: var(--green); }
+  .pill.warn { background: var(--amber-bg); color: var(--amber); }
+  .pill.bad { background: var(--red-bg); color: var(--red); }
+  .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .wait { border-left: 5px solid var(--amber); }
+  .msg { background: var(--bg); border-radius: 10px; padding: 8px 12px; margin: 6px 0; font-size: 15px; white-space: pre-wrap; word-break: break-word; }
+  .msg.bot { background: var(--blue-bg); }
+  .msg.owner { background: var(--green-bg); }
+  .msg small { display: block; color: var(--muted); font-size: 12px; }
+  button.btn, a.btn { display: inline-block; border: 0; border-radius: 10px; padding: 12px 16px; font: inherit; font-weight: 600; cursor: pointer; text-decoration: none; background: var(--blue); color: #fff; }
+  button.btn.sec, a.btn.sec { background: var(--bg); color: var(--text); border: 1px solid var(--line); }
+  button.btn:disabled { opacity: .6; cursor: wait; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  details summary { cursor: pointer; padding: 6px 0; font-weight: 600; }
+  textarea { width: 100%; min-height: 320px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; font: 14px/1.5 ui-monospace, Consolas, monospace; background: var(--bg); color: var(--text); resize: vertical; }
+  #toast { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 99px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90vw; }
+  #toast.show { opacity: 1; }
+  #err { display: none; background: var(--red-bg); color: var(--red); padding: 12px; border-radius: 10px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Shop assistant</h1>
+    <span class="muted" id="updated">Loading…</span>
+  </header>
+  <div id="err"></div>
+
+  <section class="card" id="modeCard">
+    <h2>What should the assistant do?</h2>
+    <div class="muted" id="modeNote"></div>
+    <div class="modes" id="modes"></div>
+  </section>
+
+  <section class="card" id="health"></section>
+
+  <section id="waiting"></section>
+
+  <section class="card">
+    <h2>Shop info the assistant uses</h2>
+    <p class="muted">Opening hours, prices, delivery, returns. The assistant answers only from this text. Changes take effect on the next customer message.</p>
+    <textarea id="shop" spellcheck="false" placeholder="Loading…"></textarea>
+    <div class="actions">
+      <button class="btn" id="saveShop">Save shop info</button>
+      <span class="muted" id="shopState" style="align-self:center"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Recent conversations</h2>
+    <div id="recent" class="muted">Loading…</div>
+  </section>
+
+  <p class="muted" id="stats"></p>
+</main>
+<div id="toast"></div>
+
+<script>
+(function () {
+  var KEY = new URLSearchParams(location.search).get('key') || '';
+  var API = location.pathname.replace(/\/admin\/?$/, '/admin-api');
+  var shopDirty = false;
+  var MODES = [
+    { id: 'auto', title: 'On: reply to customers', text: 'The assistant answers customers by itself.' },
+    { id: 'shadow', title: 'Practice: write drafts only', text: 'Nothing is sent to customers. Drafts arrive on Telegram so you can check them.' },
+    { id: 'off', title: 'Off: do nothing', text: 'The assistant ignores all messages. Use this if something looks wrong.' }
+  ];
+
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function toast(t) { var x = $('toast'); x.textContent = t; x.className = 'show'; setTimeout(function () { x.className = ''; }, 2600); }
+  function showErr(t) { var x = $('err'); x.style.display = t ? 'block' : 'none'; x.textContent = t || ''; }
+
+  function call(body) {
+    body.key = KEY;
+    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) {
+        if (r.status === 401) throw new Error('Wrong or missing key. Open the link you were given, including the ?key=… part.');
+        if (!r.ok) throw new Error('Server error (' + r.status + '). Try again in a minute.');
+        return r.json();
+      });
+  }
+  function ago(iso) {
+    if (!iso) return '';
+    var m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + ' min ago';
+    if (m < 1440) return Math.round(m / 60) + ' h ago';
+    return Math.round(m / 1440) + ' days ago';
+  }
+  function until(iso) {
+    var m = Math.round((new Date(iso).getTime() - Date.now()) / 60000);
+    if (m <= 0) return 'now';
+    return m < 90 ? 'in ' + m + ' min' : 'in ' + Math.round(m / 60) + ' h';
+  }
+
+  function renderModes(s) {
+    var wrap = $('modes'); wrap.textContent = '';
+    MODES.forEach(function (m) {
+      var b = el('button', 'mode ' + m.id + (s.mode === m.id ? ' sel' : ''));
+      b.appendChild(el('b', null, (s.mode === m.id ? '✓ ' : '') + m.title));
+      b.appendChild(el('span', null, m.text));
+      b.onclick = function () {
+        if (s.mode === m.id) return;
+        if (m.id === 'auto' && !confirm('Turn ON? The assistant will start replying to real customers.')) return;
+        wrap.querySelectorAll('button').forEach(function (x) { x.disabled = true; });
+        call({ action: 'set_mode', mode: m.id }).then(function () { toast('Saved'); load(); }).catch(function (e) { showErr(e.message); load(); });
+      };
+      wrap.appendChild(b);
+    });
+    $('modeNote').textContent = s.mode === 'auto' ? 'Right now: ON. Customers get replies.' : s.mode === 'shadow' ? 'Right now: PRACTICE. Customers get nothing yet.' : 'Right now: OFF.';
+  }
+
+  function renderHealth(s) {
+    var h = $('health'); h.textContent = '';
+    var row = el('div', 'row');
+    row.appendChild(el('b', null, 'Instagram connection'));
+    var d = s.token.daysLeft;
+    var pill;
+    if (d == null) pill = el('span', 'pill warn', 'Unknown');
+    else if (d < 0) pill = el('span', 'pill bad', 'Expired: needs a new token');
+    else if (d < 7) pill = el('span', 'pill warn', 'Expires in ' + Math.floor(d) + ' days');
+    else pill = el('span', 'pill ok', 'Working · renews itself (' + Math.floor(d) + ' days left)');
+    row.appendChild(pill);
+    h.appendChild(row);
+    if (d != null && d < 7) h.appendChild(el('p', 'muted', 'Follow “Renew the Instagram token” in docs/meta-setup.md.'));
+  }
+
+  function bubble(m) {
+    var d = el('div', 'msg ' + m.sender);
+    d.appendChild(el('small', null, (m.sender === 'customer' ? 'Customer' : m.sender === 'bot' ? 'Assistant' : 'You') + ' · ' + ago(m.at)));
+    d.appendChild(document.createTextNode(m.text));
+    return d;
+  }
+
+  function renderWaiting(s) {
+    var w = $('waiting'); w.textContent = '';
+    var box = el('div', 'card' + (s.waiting.length ? ' wait' : ''));
+    box.appendChild(el('h2', null, s.waiting.length ? 'Needs you (' + s.waiting.length + ')' : 'Needs you'));
+    if (!s.waiting.length) { box.appendChild(el('p', 'muted', 'Nothing is waiting for you.')); }
+    s.waiting.forEach(function (c) {
+      var item = el('div'); item.style.marginTop = '12px';
+      item.appendChild(el('div', 'muted', 'Customer …' + c.short + ' · last wrote ' + ago(c.lastCustomerAt) + ' · assistant stays quiet until ' + until(c.pausedUntil)));
+      c.messages.forEach(function (m) { item.appendChild(bubble(m)); });
+      var a = el('div', 'actions');
+      var open = el('a', 'btn', 'Reply in Instagram'); open.href = 'https://www.instagram.com/direct/inbox/'; open.target = '_blank'; open.rel = 'noopener';
+      var back = el('button', 'btn sec', 'Done: hand back to assistant');
+      back.onclick = function () { back.disabled = true; call({ action: 'resume', igsid: c.igsid }).then(function () { toast('Handed back'); load(); }).catch(function (e) { showErr(e.message); back.disabled = false; }); };
+      a.appendChild(open); a.appendChild(back); item.appendChild(a);
+      box.appendChild(item);
+    });
+    w.appendChild(box);
+  }
+
+  function renderRecent(s) {
+    var r = $('recent'); r.textContent = '';
+    if (!s.recent.length) { r.textContent = 'No conversations yet.'; return; }
+    s.recent.forEach(function (c) {
+      var d = el('details');
+      var sum = el('summary', null, '…' + c.short + ' · ' + ago(c.updatedAt) + (c.status === 'human' ? ' · with you' : ''));
+      d.appendChild(sum);
+      c.messages.forEach(function (m) { d.appendChild(bubble(m)); });
+      r.appendChild(d);
+    });
+  }
+
+  function load() {
+    return call({ action: 'status' }).then(function (s) {
+      showErr('');
+      renderModes(s); renderHealth(s); renderWaiting(s); renderRecent(s);
+      $('stats').textContent = 'Last 24 hours: ' + s.stats.inbound + ' customer messages, ' + s.stats.bot + ' assistant replies, ' + s.stats.owner + ' replies from you.';
+      $('updated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }).catch(function (e) { showErr(e.message); $('updated').textContent = ''; });
+  }
+
+  function loadShop() {
+    call({ action: 'get_shop' }).then(function (r) { $('shop').value = r.text; $('shop').placeholder = ''; shopDirty = false; })
+      .catch(function (e) { showErr(e.message); });
+  }
+  $('shop').addEventListener('input', function () { shopDirty = true; $('shopState').textContent = 'Not saved yet'; });
+  $('saveShop').onclick = function () {
+    var b = $('saveShop'); b.disabled = true;
+    call({ action: 'save_shop', text: $('shop').value }).then(function (r) {
+      if (!r.ok) throw new Error(r.error || 'Could not save');
+      shopDirty = false; $('shopState').textContent = 'Saved ✓'; toast('Shop info saved');
+    }).catch(function (e) { showErr(e.message); }).then(function () { b.disabled = false; });
+  };
+
+  load(); loadShop();
+  setInterval(function () { if (!document.hidden) load(); }, 30000);
+})();
+</script>
+</body>
+</html>
