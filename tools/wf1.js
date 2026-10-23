@@ -160,7 +160,8 @@ if (conv.last_customer_msg_at && now - new Date(conv.last_customer_msg_at).getTi
 const text = String(ctx.text || '');
 const scriptLang = /[؀-ۿ]/.test(text) ? 'fa' : null;
 const fiHint = /[äöå]|\b(ihminen|moi|hei|kiitos|onko|auki|paljonko)\b/i.test(text) ? 'fi' : null;
-out.lang_guess = scriptLang || conv.language || fiHint || 'en';
+const defLang = ['en', 'fi', 'fa'].includes(ctx.canned.default_language) ? ctx.canned.default_language : 'en';
+out.lang_guess = scriptLang || conv.language || fiHint || defLang;
 
 if (ctx.kind === 'attachment') { out.route = 'direct'; out.direct_type = 'attachment'; out.handoff_reason = 'Customer sent an attachment the bot cannot read'; return { json: out }; }
 if (ctx.sensitive) { out.route = 'direct'; out.direct_type = 'sensitive'; out.handoff_reason = 'Customer shared a card number in the DM'; return { json: out }; }
@@ -177,7 +178,8 @@ return { json: out };
 
 const DIRECT_DECISION = String.raw`
 const ctx = $json;
-const lang = ['en', 'fi', 'fa'].includes(ctx.lang_guess) ? ctx.lang_guess : 'en';
+const defLang = ['en', 'fi', 'fa'].includes(ctx.canned.default_language) ? ctx.canned.default_language : 'en';
+const lang = ['en', 'fi', 'fa'].includes(ctx.lang_guess) ? ctx.lang_guess : defLang;
 const table = ctx.direct_type === 'attachment' ? ctx.canned.attachment : ctx.direct_type === 'sensitive' ? ctx.canned.sensitive : ctx.canned.holding;
 return { json: { ...ctx, decision: {
   reply: table[lang] || table.en,
@@ -237,14 +239,32 @@ const schema = {
   },
   required: ['reply', 'language', 'handoff', 'handoff_reason', 'confidence'],
 };
-const llm_request = {
-  model: $env.LLM_MODEL || 'claude-haiku-5-5',
-  max_tokens: 700,
-  system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
-  messages: ctx.history,
-  tools: [{ name: 'reply_to_customer', description: 'Send the reply to the customer and report handoff status.', input_schema: schema }],
-  tool_choice: { type: 'tool', name: 'reply_to_customer' },
-};
+const provider = String($env.LLM_PROVIDER || 'anthropic').toLowerCase() === 'openai' ? 'openai' : 'anthropic';
+let llm_request;
+if (provider === 'openai') {
+  // OpenAI-compatible chat completions (Groq, OpenRouter, ...). Models answer null or an empty string when there is no handoff; allow both.
+  const params = JSON.parse(JSON.stringify(schema));
+  params.properties.handoff_reason = { type: ['string', 'null'], description: 'Why a person must take over; null when handoff is false' };
+  const model = $env.LLM_MODEL || 'openai/gpt-oss-120b';
+  llm_request = {
+    model,
+    max_tokens: 1500,
+    temperature: 0.2,
+    messages: [{ role: 'system', content: system }, ...ctx.history],
+    tools: [{ type: 'function', function: { name: 'reply_to_customer', description: 'Send the reply to the customer and report handoff status.', parameters: params } }],
+    tool_choice: { type: 'function', function: { name: 'reply_to_customer' } },
+  };
+  if (/gpt-oss/.test(model)) llm_request.reasoning_effort = 'low';
+} else {
+  llm_request = {
+    model: $env.LLM_MODEL || 'claude-haiku-5-5',
+    max_tokens: 700,
+    system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
+    messages: ctx.history,
+    tools: [{ name: 'reply_to_customer', description: 'Send the reply to the customer and report handoff status.', input_schema: schema }],
+    tool_choice: { type: 'tool', name: 'reply_to_customer' },
+  };
+}
 return { json: { ...ctx, llm_request } };
 `;
 
@@ -255,6 +275,16 @@ const resp = $json || {};
 let d = null;
 const block = Array.isArray(resp.content) ? resp.content.find((b) => b.type === 'tool_use' && b.name === 'reply_to_customer') : null;
 if (block && block.input) d = block.input;
+else if ((Array.isArray(resp.choices) && resp.choices[0] && resp.choices[0].message) || Array.isArray(resp.tool_calls)) { // OpenAI-compatible (n8n may hand over choices[0].message directly)
+  const msg = Array.isArray(resp.tool_calls) ? resp : resp.choices[0].message;
+  const call = (msg.tool_calls || []).find((c) => c.function && c.function.name === 'reply_to_customer');
+  const raw = call ? call.function.arguments : msg.content;
+  if (typeof raw === 'string') {
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (m) { try { d = JSON.parse(m[0]); } catch (e) { d = null; } }
+  } else if (raw && typeof raw === 'object') d = raw;
+  if (d && d.handoff_reason === '') d.handoff_reason = null;
+}
 else if (Array.isArray(resp.content)) { // tolerate plain-text JSON
   const t = resp.content.filter((b) => b.type === 'text').map((b) => b.text).join('');
   const m = t.match(/\{[\s\S]*\}/);
@@ -267,17 +297,19 @@ delete base.llm_request; // not needed after the call
 
 if (!valid) {
   if ($runIndex === 0) return { json: { ...base, llm_request: ctx.llm_request, retry: true } }; // retry once
-  const lang = ['en', 'fi', 'fa'].includes(ctx.lang_guess) ? ctx.lang_guess : 'en';
+  const defLang = ['en', 'fi', 'fa'].includes(ctx.canned.default_language) ? ctx.canned.default_language : 'en';
+  const lang = ['en', 'fi', 'fa'].includes(ctx.lang_guess) ? ctx.lang_guess : defLang;
   return { json: { ...base, retry: false, decision: {
     reply: ctx.canned.holding[lang] || ctx.canned.holding.en, language: lang, handoff: true,
     handoff_reason: 'LLM output unusable after retry' + (resp.error ? ': ' + String((resp.error.message || resp.error)).slice(0, 200) : ''),
     confidence: 'low' } } };
 }
 let lang = String(d.language || '').toLowerCase().slice(0, 2);
-if (!/^[a-z]{2}$/.test(lang)) lang = 'en';
+const defLang2 = ['en', 'fi', 'fa'].includes(ctx.canned.default_language) ? ctx.canned.default_language : 'en';
+if (!/^[a-z]{2}$/.test(lang)) lang = defLang2;
 let decision = { reply: d.reply.trim(), language: lang, handoff: d.handoff, handoff_reason: d.handoff ? (d.handoff_reason || 'handoff requested') : null, confidence: d.confidence };
 if (d.confidence === 'low') {
-  const l = ['en', 'fi', 'fa'].includes(lang) ? lang : 'en';
+  const l = ['en', 'fi', 'fa'].includes(lang) ? lang : defLang2;
   decision = { ...decision, reply: ctx.canned.holding[l] || ctx.canned.holding.en, handoff: true, handoff_reason: (d.handoff_reason || 'low confidence') + ' (confidence: low)' };
 }
 return { json: { ...base, retry: false, decision } };
@@ -291,7 +323,8 @@ const mode = ctx.mode === 'auto' ? 'auto' : 'shadow';
 const last = ctx.conv.last_customer_msg_at ? new Date(ctx.conv.last_customer_msg_at).getTime() : now;
 const blocked = now - last > 24 * 3600 * 1000; // 24-hour messaging window
 
-const lang = ['en', 'fi', 'fa'].includes(d.language) ? d.language : 'en';
+const defLang = ['en', 'fi', 'fa'].includes(ctx.canned.default_language) ? ctx.canned.default_language : 'en';
+const lang = ['en', 'fi', 'fa'].includes(d.language) ? d.language : defLang;
 let full = d.reply;
 if (!ctx.conv.disclosed) full = (ctx.canned.disclosure[lang] || ctx.canned.disclosure.en) + '\n\n' + d.reply;
 
@@ -445,16 +478,17 @@ function build() {
   code(wf, 'Build LLM Request', [4000, 700], BUILD_LLM);
   wf.add('Call LLM', 'n8n-nodes-base.httpRequest', 4.2, [4220, 700], {
     method: 'POST',
-    url: "={{ ($env.ANTHROPIC_API_BASE || 'https://api.anthropic.com') }}/v1/messages",
+    url: "={{ String($env.LLM_PROVIDER || 'anthropic').toLowerCase() === 'openai' ? ($env.LLM_API_BASE || 'https://api.groq.com/openai/v1') + '/chat/completions' : ($env.ANTHROPIC_API_BASE || 'https://api.anthropic.com') + '/v1/messages' }}",
     sendHeaders: true,
     headerParameters: { parameters: [
-      { name: 'x-api-key', value: '={{ $env.ANTHROPIC_API_KEY }}' },
+      { name: 'x-api-key', value: "={{ String($env.LLM_PROVIDER || 'anthropic').toLowerCase() === 'openai' ? 'unused' : $env.ANTHROPIC_API_KEY }}" },
+      { name: 'Authorization', value: "={{ String($env.LLM_PROVIDER || 'anthropic').toLowerCase() === 'openai' ? 'Bearer ' + $env.LLM_API_KEY : 'unused' }}" },
       { name: 'anthropic-version', value: '2023-06-01' },
       { name: 'content-type', value: 'application/json' },
     ] },
     sendBody: true, specifyBody: 'json', jsonBody: '={{ JSON.stringify($json.llm_request) }}',
     options: { timeout: 45000 },
-  }, { onError: 'continueRegularOutput' });
+  }, { retryOnFail: true, maxTries: 3, waitBetweenTries: 5000, onError: 'continueRegularOutput' }); // free tiers return 429 when busy
   code(wf, 'Parse LLM', [4440, 700], PARSE_LLM);
   ifNode(wf, 'Retry?', [4660, 700], '$json.retry === true');
   wf.connect('Route', 'Debounce Wait', 1);

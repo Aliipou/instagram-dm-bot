@@ -16,7 +16,7 @@ This is the one document to follow from "nothing" to "the assistant answers my I
 | Facebook login | Needed only to open developers.facebook.com | free |
 | A domain name | For example `myshop.fi`. You only need a subdomain such as `n8n.myshop.fi` | 10 to 15 EUR / year |
 | A small server (VPS) in the EU | 2 GB RAM is enough. Hetzner CX22, or similar | 4 to 6 EUR / month |
-| Anthropic API key | https://console.anthropic.com, add a few euros of credit | a few EUR / month at small-shop volume |
+| AI model key | Either Anthropic (console.anthropic.com, a few EUR / month) **or a free Groq key** (console.groq.com) | free with Groq, see the privacy note below |
 | Telegram | A bot for your alerts (steps below) | free |
 
 Not supported: n8n Cloud, because the assistant reads and writes `knowledge/shop.md` as a file on the server.
@@ -25,7 +25,9 @@ Not supported: n8n Cloud, because the assistant reads and writes `knowledge/shop
 
 Open `knowledge/shop.md` and fill in every section: name, address, opening hours, products with prices, delivery, returns, FAQ, and "Always hand off". The assistant answers **only** from this text, so anything missing means "I'll ask the team". You can edit it later from the dashboard.
 
-Also edit `prompts/system.md`, section CANNED MESSAGES: set `shop_name` and check the Finnish and Persian lines.
+Also edit `prompts/system.md`, section CANNED MESSAGES: set `shop_name` (otherwise customers see `<SHOP NAME>`) and have a native speaker check the Persian and Finnish lines. **The assistant replies in Persian (Farsi) by default**; it answers in English or Finnish only when the customer clearly writes in that language. To change the default, edit `default_language` in the same block and rule 6 above it.
+
+**Privacy note for free AI tiers:** free plans may allow the provider to use prompts to improve models. Read the provider's terms before using a real client's DMs, and mention the provider in the privacy policy. Groq's free tier for the 120B model allows about 1,000 requests a day and 8,000 tokens a minute, plenty for a small shop.
 
 ## Step 2: Get a Telegram bot for alerts (5 minutes)
 
@@ -63,7 +65,7 @@ Fill in `.env`:
 | `N8N_ENCRYPTION_KEY` | output of `openssl rand -hex 32` (keep a copy, you cannot recover data without it) |
 | `IG_VERIFY_TOKEN` | output of `openssl rand -hex 16` |
 | `ADMIN_KEY` | output of `openssl rand -hex 16`. This is your dashboard password |
-| `ANTHROPIC_API_KEY` | from console.anthropic.com |
+| `LLM_PROVIDER`, `LLM_API_BASE`, `LLM_API_KEY`, `LLM_MODEL` | Free option (tested): `openai`, `https://api.groq.com/openai/v1`, your Groq key, `openai/gpt-oss-120b`. For Anthropic instead: `anthropic` and fill `ANTHROPIC_API_KEY`, `LLM_MODEL=claude-haiku-5-5` |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | from Step 2 |
 | `BOT_MODE` | leave `shadow` |
 
